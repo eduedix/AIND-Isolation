@@ -36,12 +36,88 @@ def custom_score(game, player):
     float
         The heuristic value of the current game state to the specified player.
     """
+    own_moves = game.get_legal_moves(player)
+    opponent_moves = game.get_legal_moves(game.get_opponent(player))
 
-    # TODO: finish this function!
-    raise NotImplementedError
+    own_moves_length = len(own_moves)
+    opponent_moves_length = len(opponent_moves)
+
+    def eval_1():
+        return float((own_moves_length - opponent_moves_length) * (own_moves_length + opponent_moves_length))
+
+    def eval_2():
+        return float(own_moves_length - 2 * opponent_moves_length)
+
+    def eval_3():
+        game_size = game.width * game.height
+        return float(own_moves_length - opponent_moves_length - game.move_count)
+
+    def eval_4():
+        game_size = game.width * game.height
+
+        if game.move_count < 0.1 * game_size:
+            return float(own_moves_length - opponent_moves_length)
+        elif game.move_count < 0.8 * game_size:
+            return float(own_moves_length - opponent_moves_length - game.move_count)
+        else:
+            return float(own_moves_length - opponent_moves_length)
+
+    def eval_5():
+        import random
+        possibility = random.random()
+
+        if possibility < 0.4:
+            return own_moves_length - opponent_moves_length
+        else:
+            return own_moves_length - opponent_moves_length - game.move_count
+
+    def eval_6():
+        game_size = game.width * game.height
+        if game.move_count < 0.9 * game_size:
+            return float(own_moves_length - opponent_moves_length)
+        else:
+            return float(own_moves_length - opponent_moves_length - game.move_count)
+
+    def eval_7():
+        game_size = game.width * game.height
+        if game.move_count < 0.1 * game_size:
+            return float(own_moves_length)
+        elif game.move_count < 0.9 * game_size:
+            return float(own_moves_length - opponent_moves_length + game.move_count)
+        else:
+            return float(own_moves_length - opponent_moves_length - game.move_count)
+
+    def eval_8():
+        game_size = game.width * game.height
+        if game.move_count < 0.1 * game_size:
+            return float(own_moves_length)
+        else:
+            return float(own_moves_length - opponent_moves_length + game.move_count)
+
+    def eval_9():
+        return float(own_moves_length - opponent_moves_length + game.move_count)
+
+    def eval_10():
+        game_size = game.width * game.height
+        occupancy = game.move_count / game_size
+        return occupancy * (own_moves_length - opponent_moves_length) + game.move_count
+
+    def eval_11():
+        game_size = game.width * game.height
+        occupancy = game.move_count / game_size
+        return occupancy * (own_moves_length - (2 * occupancy) * opponent_moves_length) + game.move_count
 
 
-class CustomPlayer:
+    if game.is_loser(player):
+        return float('-inf')
+
+    if game.is_winner(player):
+        return float('inf')
+
+    return eval_9()
+
+
+class CustomPlayer(object):
     """Game-playing agent that chooses a move using your evaluation function
     and a depth-limited minimax algorithm with alpha-beta pruning. You must
     finish and test this player to make sure it properly uses minimax and
@@ -118,25 +194,40 @@ class CustomPlayer:
 
         self.time_left = time_left
 
-        # TODO: finish this function!
-
         # Perform any required initializations, including selecting an initial
         # move from the game board (i.e., an opening book), or returning
         # immediately if there are no legal moves
+        if not legal_moves:
+            return (-1, -1)
+
+        score, move = float('-inf'), legal_moves[0]
 
         try:
             # The search method call (alpha beta or minimax) should happen in
             # here in order to avoid timeout. The try/except block will
             # automatically catch the exception raised by the search method
             # when the timer gets close to expiring
-            pass
+            if self.method == 'minimax':
+                method = self.minimax
+            elif self.method == 'alphabeta':
+                method = self.alphabeta
+
+            if self.iterative:
+                depth = 1
+                while score is not float('inf'):
+                    score, move = max(
+                        method(game, depth), (score, move))
+                    depth += 1
+            else:
+                score, move = max(
+                    method(game, self.search_depth), (score, move))
 
         except Timeout:
             # Handle any actions required at timeout, if necessary
-            pass
+            return move
 
         # Return the best move from the last completed search iteration
-        raise NotImplementedError
+        return move
 
     def minimax(self, game, depth, maximizing_player=True):
         """Implement the minimax search algorithm as described in the lectures.
@@ -172,8 +263,24 @@ class CustomPlayer:
         if self.time_left() < self.TIMER_THRESHOLD:
             raise Timeout()
 
-        # TODO: finish this function!
-        raise NotImplementedError
+        move = (-1, -1)
+
+        if depth == 0:
+            return self.score(game, self), move
+
+        if maximizing_player:
+            eval_func = max
+            score = float('-inf')
+        else:
+            eval_func = min
+            score = float('inf')
+
+        for legal_move in game.get_legal_moves():
+            current_score, _ = self.minimax(
+                game.forecast_move(legal_move), depth - 1, not maximizing_player)
+            score, move = eval_func((score, move), (current_score, legal_move))
+
+        return score, move
 
     def alphabeta(self, game, depth, alpha=float("-inf"), beta=float("inf"), maximizing_player=True):
         """Implement minimax search with alpha-beta pruning as described in the
@@ -213,8 +320,39 @@ class CustomPlayer:
                 to pass the project unit tests; you cannot call any other
                 evaluation function directly.
         """
+
         if self.time_left() < self.TIMER_THRESHOLD:
             raise Timeout()
 
-        # TODO: finish this function!
-        raise NotImplementedError
+        move = (-1, -1)
+
+        if depth == 0:
+            return self.score(game, self), move
+
+        if maximizing_player:
+            score = float('-inf')
+            legal_moves = game.get_legal_moves()
+        else:
+            score = float('inf')
+            legal_moves = game.get_legal_moves(game.get_opponent(self))
+
+        for legal_move in legal_moves:
+            current_score, _ = self.alphabeta(
+                game.forecast_move(legal_move), depth - 1, alpha, beta, not maximizing_player)
+            if maximizing_player:
+                if current_score > score:
+                    score, move = current_score, legal_move
+                    if score > alpha:
+                        alpha = score
+                    if score >= beta:
+                        return score, move
+            else:
+                if current_score < score:
+                    score, move = current_score, legal_move
+                    if score < beta:
+                        beta = score
+                score, move = min((score, move), (current_score, legal_move))
+                if score <= alpha:
+                    return score, move
+
+        return score, move
